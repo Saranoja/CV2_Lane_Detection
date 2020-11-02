@@ -3,15 +3,20 @@ import numpy as np
 
 cam = cv2.VideoCapture('Lane Detection Test Video 01.mp4')
 
-while True:
-    ret, frame = cam.read()
-    if ret is False:
-        break
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+def start_detection():
+    while True:
+        ret, frame = cam.read()
+        if ret is False:
+            break
 
-    cv2.imshow('Original', frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
-cam.release()
-cv2.destroyAllWindows()
+        cv2.imshow('Original', frame)
+
+
+if __name__ == "__main__":
+    start_detection()
+    cam.release()
+    cv2.destroyAllWindows()
