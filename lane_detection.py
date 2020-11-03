@@ -85,7 +85,22 @@ def combine_filtered_versions_of_frame(fr):
 
 
 def get_binary_frame(filtered_frame):
-    pass
+    threshold = int(255 / 2) - 10
+    for i in range(filtered_frame.shape[0]):
+        for j in range(filtered_frame.shape[1]):
+            if filtered_frame[i][j] < threshold:
+                filtered_frame[i][j] = 0
+            else:
+                filtered_frame[i][j] = 255
+    return filtered_frame
+
+
+def remove_redundant_columns(width, fr):
+    fr_copy = fr.copy()
+    columns = int(width * 0.2)
+    fr_copy[0:, 0:columns] = 0
+    fr_copy[0:, -columns:] = 0
+    return fr_copy
 
 
 def start_detection():
@@ -120,7 +135,13 @@ def start_detection():
         # cv2.imshow('Blurred', blurred_top_down_view)
 
         sobel_filtered_top_down_view = combine_filtered_versions_of_frame(blurred_top_down_view)
-        cv2.imshow('Sobel-filtered', sobel_filtered_top_down_view)
+        # cv2.imshow('Sobel-filtered', sobel_filtered_top_down_view)
+
+        binary_filtered_top_down = get_binary_frame(sobel_filtered_top_down_view)
+        # cv2.imshow('Binary', binary_filtered_top_down)
+
+        reduced_binary = remove_redundant_columns(width, sobel_filtered_top_down_view)
+        cv2.imshow('Binary and reduced', reduced_binary)
 
 
 if __name__ == "__main__":
