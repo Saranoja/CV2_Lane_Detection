@@ -120,6 +120,10 @@ def remove_redundant_columns(width, fr):
     return fr_copy
 
 
+def apply_regression_on_points(x_arr, y_arr):
+    return np.polyfit(x_arr, y_arr, deg=1)
+
+
 def start_detection():
     while True:
         global ret, frame
@@ -155,10 +159,14 @@ def start_detection():
         # cv2.imshow('Sobel-filtered', sobel_filtered_top_down_view)
 
         binary_filtered_top_down = get_binary_frame(sobel_filtered_top_down_view)
-        cv2.imshow('Binary', binary_filtered_top_down)
+        # cv2.imshow('Binary', binary_filtered_top_down)
 
         reduced_binary = remove_redundant_columns(width, sobel_filtered_top_down_view)
-        # cv2.imshow('Binary and reduced', reduced_binary)
+        cv2.imshow('Binary and reduced', reduced_binary)
+
+        left_xs, left_ys, right_xs, right_ys = get_white_points_coordinates(reduced_binary, width, height)
+        left_side_line_coef = apply_regression_on_points(left_ys, left_ys)
+        right_side_line_coef = apply_regression_on_points(right_xs, right_ys)
 
 
 if __name__ == "__main__":
