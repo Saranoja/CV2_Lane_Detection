@@ -7,6 +7,14 @@ cam = cv2.VideoCapture('Lane Detection Test Video 01.mp4')
 ret, frame = cam.read()
 
 
+def get_screen_corners_from_dimensions(width, height):
+    upper_left_corner = (0, 0)
+    upper_right_corner = (width, 0)
+    lower_left_corner = (0, height)
+    lower_right_corner = (width, height)
+    return [upper_right_corner, upper_left_corner, lower_left_corner, lower_right_corner]
+
+
 def get_resized_frame_dimensions(scale_ratio):
     width = int(frame.shape[1] * scale_ratio)
     height = int(frame.shape[0] * scale_ratio)
@@ -43,6 +51,13 @@ def get_greyscale_road(grayscale_frame, trapezoid_frame):
     return grayscale_frame * trapezoid_frame
 
 
+def get_birds_eye_view(road_frame, width, height):
+    screen_corners = np.array(get_screen_corners_from_dimensions(width, height), dtype=np.float32)
+    trapezoid_corners = np.float32(get_trapezoid_corners(width, height))
+    magic_matrix = cv2.getPerspectiveTransform(trapezoid_corners, screen_corners)
+    return cv2.warpPerspective(road_frame, magic_matrix, (width, height))
+
+
 def start_detection():
     while True:
         global ret, frame
@@ -67,6 +82,9 @@ def start_detection():
 
         grayscale_road_frame = get_greyscale_road(grayscale_frame, trapezoid_frame)
         cv2.imshow('Road', grayscale_road_frame)
+
+        top_down_view = get_birds_eye_view(grayscale_road_frame, width, height)
+        cv2.imshow('Birds eye', top_down_view)
 
 
 if __name__ == "__main__":
