@@ -84,6 +84,10 @@ def combine_filtered_versions_of_frame(fr):
     # cv2.imshow("Horizontal", sobel_horizontal_frame)
 
 
+def get_binary_frame(filtered_frame):
+    pass
+
+
 def start_detection():
     while True:
         global ret, frame
