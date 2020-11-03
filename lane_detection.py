@@ -3,6 +3,11 @@ import numpy as np
 
 # comments only for check up
 
+VERTICAL_SOBEL = np.float32([[-1, -2, -1],
+                             [0, 0, 0],
+                             [+1, +2, +1]])
+HORIZONTAL_SOBEL = np.transpose(VERTICAL_SOBEL)
+
 cam = cv2.VideoCapture('Lane Detection Test Video 01.mp4')
 ret, frame = cam.read()
 
@@ -62,6 +67,23 @@ def get_burred_frame(fr):
     return cv2.blur(fr, ksize=(3, 3))
 
 
+def filter_frame(fr_32, filter_matrix):
+    return cv2.filter2D(fr_32, -1, filter_matrix)
+
+
+def combine_filtered_versions_of_frame(fr):
+    fr_32 = np.float32(fr)
+    sobel_vertical_frame = cv2.filter2D(fr_32, -1, VERTICAL_SOBEL)
+    sobel_horizontal_frame = cv2.filter2D(fr_32, -1, HORIZONTAL_SOBEL)
+    sobel_result_frame = np.sqrt(sobel_vertical_frame ** 2 + sobel_horizontal_frame ** 2)
+    return cv2.convertScaleAbs(sobel_result_frame)
+    # separate filtered frames - add only for check up
+    # sobel_vertical_frame = cv2.convertScaleAbs(sobel_vertical_frame)
+    # cv2.imshow("Vertical", sobel_vertical_frame)
+    # sobel_horizontal_frame = cv2.convertScaleAbs(sobel_horizontal_frame)
+    # cv2.imshow("Horizontal", sobel_horizontal_frame)
+
+
 def start_detection():
     while True:
         global ret, frame
@@ -88,10 +110,13 @@ def start_detection():
         # cv2.imshow('Road', grayscale_road_frame)
 
         top_down_view = get_birds_eye_view(grayscale_road_frame, width, height)
-        cv2.imshow('Birds eye', top_down_view)
+        # cv2.imshow('Birds eye', top_down_view)
 
         blurred_top_down_view = get_burred_frame(top_down_view)
-        cv2.imshow('Blurred', blurred_top_down_view)
+        # cv2.imshow('Blurred', blurred_top_down_view)
+
+        sobel_filtered_top_down_view = combine_filtered_versions_of_frame(blurred_top_down_view)
+        cv2.imshow('Sobel-filtered', sobel_filtered_top_down_view)
 
 
 if __name__ == "__main__":
