@@ -58,6 +58,10 @@ def get_birds_eye_view(road_frame, width, height):
     return cv2.warpPerspective(road_frame, magic_matrix, (width, height))
 
 
+def get_burred_frame(fr):
+    return cv2.blur(fr, ksize=(3, 3))
+
+
 def start_detection():
     while True:
         global ret, frame
@@ -81,10 +85,13 @@ def start_detection():
         # cv2.imshow('Trapezoid', trapezoid_frame * 255)
 
         grayscale_road_frame = get_greyscale_road(grayscale_frame, trapezoid_frame)
-        cv2.imshow('Road', grayscale_road_frame)
+        # cv2.imshow('Road', grayscale_road_frame)
 
         top_down_view = get_birds_eye_view(grayscale_road_frame, width, height)
         cv2.imshow('Birds eye', top_down_view)
+
+        blurred_top_down_view = get_burred_frame(top_down_view)
+        cv2.imshow('Blurred', blurred_top_down_view)
 
 
 if __name__ == "__main__":
