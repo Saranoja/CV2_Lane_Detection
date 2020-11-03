@@ -85,7 +85,7 @@ def combine_filtered_versions_of_frame(fr):
 
 
 def get_binary_frame(filtered_frame):
-    threshold = int(255 / 2) - 10
+    threshold = int(255 / 2)
     for i in range(filtered_frame.shape[0]):
         for j in range(filtered_frame.shape[1]):
             if filtered_frame[i][j] < threshold:
@@ -93,6 +93,20 @@ def get_binary_frame(filtered_frame):
             else:
                 filtered_frame[i][j] = 255
     return filtered_frame
+
+
+def get_white_points_coordinates(fr, width, height):
+    left_slice = fr[0:height, 0:int(width / 2)]
+    right_slice = fr[0:height, int(width / 2):]
+    left_slice_array = np.argwhere(left_slice == 255)
+    right_slice_array = np.argwhere(right_slice == 255)
+
+    left_xs = np.array([int(x) for y, x in left_slice_array])
+    left_ys = np.array([int(y) for y, x in left_slice_array])
+    right_xs = np.array([int(x + int(width / 2)) for y, x in right_slice_array])
+    right_ys = np.array([int(y) for y, x in right_slice_array])
+
+    return left_xs, left_ys, right_xs, right_ys
 
 
 def remove_redundant_columns(width, fr):
