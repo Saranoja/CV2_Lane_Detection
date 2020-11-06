@@ -85,16 +85,10 @@ def combine_filtered_versions_of_frame(fr):
 
 
 def get_binary_frame(filtered_frame):
-    threshold = int(255 / 2)
+    threshold = int(255 / 2) - 30
     applyThresholdOverArray = np.vectorize(lambda x: 0 if x < threshold else 255)
     for i in range(filtered_frame.shape[0]):
         filtered_frame[i] = applyThresholdOverArray(filtered_frame[i])
-    # for i in range(filtered_frame.shape[0]):
-    #     for j in range(filtered_frame.shape[1]):
-    #         if filtered_frame[i][j] < threshold:
-    #             filtered_frame[i][j] = 0
-    #         else:
-    #             filtered_frame[i][j] = 255
     return filtered_frame
 
 
@@ -158,15 +152,7 @@ def add_lines(fr):
     previous_right_bottom_x, _ = right_bottom_point
     fr = cv2.line(fr, right_top_point, right_bottom_point, (100, 100, 100), 5)
 
-    return fr
-
-
-# def get_good_visualization(fr):
-#     blank_frame = np.zeros((fr.shape[1], fr.shape[0]), dtype=np.uint8)
-#
-#
-#
-#     pass
+    return fr, left_top_point, left_bottom_point, right_top_point, right_bottom_point
 
 
 def start_detection():
@@ -209,10 +195,46 @@ def start_detection():
         reduced_binary = remove_redundant_columns(width, binary_filtered_top_down)
         # cv2.imshow('Binary and reduced', reduced_binary)
 
-        line_frame = add_lines(reduced_binary)
-        cv2.imshow('lines', line_frame)
+        line_frame, left_top_point, left_bottom_point, right_top_point, right_bottom_point = add_lines(reduced_binary)
+        # cv2.imshow('lines', line_frame)
 
-        blank_frame = np.zeros(width, height)
+
+
+
+        blank_frame = np.zeros((height, width), dtype=np.uint8)
+        cv2.line(blank_frame, left_top_point, left_bottom_point, (255, 0, 0), 3)
+
+        screen_bounds = np.array(get_screen_corners_from_dimensions(width, height), dtype=np.float32)
+        trapezoid_bounds = np.array(get_trapezoid_corners(width, height), dtype=np.float32)
+
+        magic_matrix_final_left = cv2.getPerspectiveTransform(screen_bounds,
+                                                              trapezoid_bounds)
+        top_down_frame_final_left = cv2.warpPerspective(blank_frame, magic_matrix_final_left, (width, height))
+
+        left_slice_final = top_down_frame_final_left[0:height, 0:int(width / 2)]
+        left_slice_array_final = np.argwhere(left_slice_final == 255)
+
+        left_xs_final = np.array([int(x) for y, x in left_slice_array_final])
+        left_ys_final = np.array([int(y) for y, x in left_slice_array_final])
+        cv2.imshow('Top', top_down_frame_final_left)
+        # right
+        blank_frame_1 = np.zeros((height, width), dtype=np.uint8)
+        cv2.line(blank_frame_1, right_top_point, right_bottom_point, (255, 0, 0), 3)
+        magic_matrix_final_right = cv2.getPerspectiveTransform(screen_bounds,
+                                                               trapezoid_bounds)
+        top_down_frame_final_right = cv2.warpPerspective(blank_frame_1, magic_matrix_final_right, (width, height))
+
+        right_slice_final = top_down_frame_final_right[0:height, int(width / 2):]
+        right_slice_array_final = np.argwhere(right_slice_final == 255)
+        right_xs_final = np.array([int(x + int(width / 2)) for y, x in right_slice_array_final])
+        right_ys_final = np.array([int(y) for y, x in right_slice_array_final])
+        cv2.imshow('Right',top_down_frame_final_right)
+        frame_copy = resized_frame.copy()
+        for i in range(len(left_xs_final)):
+            frame_copy[left_ys_final[i]][left_xs_final[i]] = [50, 50, 250]
+        for i in range(len(right_xs_final)):
+            frame_copy[right_ys_final[i]][right_xs_final[i]] = [50, 250, 50]
+        cv2.imshow('Final', frame_copy)
 
 
 previous_left_top_x, previous_left_bottom_x, previous_right_top_x, previous_right_bottom_x = 0, 0, 0, 0
