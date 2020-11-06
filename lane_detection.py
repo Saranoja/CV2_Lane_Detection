@@ -1,15 +1,12 @@
 import cv2
 import numpy as np
 
-# comments only for check up
-
 VERTICAL_SOBEL = np.float32([[-1, -2, -1],
                              [0, 0, 0],
                              [+1, +2, +1]])
 HORIZONTAL_SOBEL = np.transpose(VERTICAL_SOBEL)
 
-cam = cv2.VideoCapture('Lane Detection Test Video 01.mp4')
-ret, frame = cam.read()
+cam = cv2.VideoCapture('video.mp4')
 
 
 def get_screen_corners_from_dimensions(width, height):
@@ -20,27 +17,25 @@ def get_screen_corners_from_dimensions(width, height):
     return [upper_right_corner, upper_left_corner, lower_left_corner, lower_right_corner]
 
 
-def get_resized_frame_dimensions(scale_ratio):
+def get_resized_frame_dimensions(frame, scale_ratio):
     width = int(frame.shape[1] * scale_ratio)
     height = int(frame.shape[0] * scale_ratio)
     return width, height
 
 
-# dimensions = (width, height) tuple
-def resize_frame(dimensions):
-    resized_frame = cv2.resize(frame, dimensions)
-    return resized_frame
+def get_frame_grayscale(frame, width, height):
+    newFrame = np.zeros((height, width), dtype=np.uint8)
+    for i in range(height):
+        for j in range(width):
+            newFrame[i, j] = frame[i, j, 0] * .11 + frame[i, j, 1] * 0.6 + frame[i, j, 2] * 0.3
+    return newFrame
 
 
-def get_grayscale_frame(fr):
-    return cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY)
-
-
-def get_trapezoid_corners(window_width, window_height):
-    upper_left = (0.45 * window_width, 0.75 * window_height)
-    upper_right = (0.55 * window_width, 0.75 * window_height)
-    lower_left = (0, window_height)
-    lower_right = (window_width, window_height)
+def get_trapezoid_corners(width, height):
+    upper_right = (0.55 * width, 0.75 * height)
+    upper_left = (0.45 * width, 0.75 * height)
+    lower_left = (0, height)
+    lower_right = (width, height)
     return [upper_right, upper_left, lower_left, lower_right]
 
 
@@ -52,23 +47,11 @@ def get_trapezoid_frame(trapezoid_bounds, frame_dimensions):
     return trapezoid_frame
 
 
-def get_greyscale_road(grayscale_frame, trapezoid_frame):
-    return grayscale_frame * trapezoid_frame
-
-
 def get_birds_eye_view(road_frame, width, height):
     screen_corners = np.array(get_screen_corners_from_dimensions(width, height), dtype=np.float32)
     trapezoid_corners = np.float32(get_trapezoid_corners(width, height))
     magic_matrix = cv2.getPerspectiveTransform(trapezoid_corners, screen_corners)
     return cv2.warpPerspective(road_frame, magic_matrix, (width, height))
-
-
-def get_blurred_frame(fr):
-    return cv2.blur(fr, ksize=(3, 3))
-
-
-def filter_frame(fr_32, filter_matrix):
-    return cv2.filter2D(fr_32, -1, filter_matrix)
 
 
 def combine_filtered_versions_of_frame(fr):
@@ -77,15 +60,10 @@ def combine_filtered_versions_of_frame(fr):
     sobel_horizontal_frame = cv2.filter2D(fr_32, -1, HORIZONTAL_SOBEL)
     sobel_result_frame = np.sqrt(sobel_vertical_frame ** 2 + sobel_horizontal_frame ** 2)
     return cv2.convertScaleAbs(sobel_result_frame)
-    # separate filtered frames - add only for check up
-    # sobel_vertical_frame = cv2.convertScaleAbs(sobel_vertical_frame)
-    # cv2.imshow("Vertical", sobel_vertical_frame)
-    # sobel_horizontal_frame = cv2.convertScaleAbs(sobel_horizontal_frame)
-    # cv2.imshow("Horizontal", sobel_horizontal_frame)
 
 
 def get_binary_frame(filtered_frame):
-    threshold = int(255 / 2) - 30
+    threshold = int(255 / 2) - 20
     applyThresholdOverArray = np.vectorize(lambda x: 0 if x < threshold else 255)
     for i in range(filtered_frame.shape[0]):
         filtered_frame[i] = applyThresholdOverArray(filtered_frame[i])
@@ -155,91 +133,99 @@ def add_lines(fr):
     return fr, left_top_point, left_bottom_point, right_top_point, right_bottom_point
 
 
-def start_detection():
-    while True:
-        global ret, frame, previous_left_top_x, previous_left_bottom_x, previous_right_top_x, previous_right_bottom_x
-        ret, frame = cam.read()
+def get_final_frame(fr, left_top_point, left_bottom_point, right_top_point, right_bottom_point):
+    height = fr.shape[0]
+    width = fr.shape[1]
 
-        if ret is False:
-            break
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+    blank_frame = np.zeros((height, width), dtype=np.uint8)
+    cv2.line(blank_frame, left_top_point, left_bottom_point, (255, 0, 0), 3)
+
+    screen_bounds = np.array(get_screen_corners_from_dimensions(width, height), dtype=np.float32)
+    trapezoid_bounds = np.array(get_trapezoid_corners(width, height), dtype=np.float32)
+
+    # left
+    magic_matrix_final_left = cv2.getPerspectiveTransform(screen_bounds,
+                                                          trapezoid_bounds)
+    top_down_frame_final_left = cv2.warpPerspective(blank_frame, magic_matrix_final_left, (width, height))
+
+    left_slice_final = top_down_frame_final_left[0:height, 0:int(width / 2)]
+    left_slice_array_final = np.argwhere(left_slice_final == 255)
+
+    left_xs_final = np.array([int(x) for y, x in left_slice_array_final])
+    left_ys_final = np.array([int(y) for y, x in left_slice_array_final])
+
+    # right
+    blank_frame_1 = np.zeros((height, width), dtype=np.uint8)
+    cv2.line(blank_frame_1, right_top_point, right_bottom_point, (255, 0, 0), 3)
+    magic_matrix_final_right = cv2.getPerspectiveTransform(screen_bounds,
+                                                           trapezoid_bounds)
+    top_down_frame_final_right = cv2.warpPerspective(blank_frame_1, magic_matrix_final_right, (width, height))
+
+    right_slice_final = top_down_frame_final_right[0:height, int(width / 2):]
+    right_slice_array_final = np.argwhere(right_slice_final == 255)
+    right_xs_final = np.array([int(x + int(width / 2)) for y, x in right_slice_array_final])
+    right_ys_final = np.array([int(y) for y, x in right_slice_array_final])
+
+    final_frame = fr.copy()
+    for i in range(len(left_xs_final)):
+        final_frame[left_ys_final[i]][left_xs_final[i]] = [0, 0, 250]
+    for i in range(len(right_xs_final)):
+        final_frame[right_ys_final[i]][right_xs_final[i]] = [0, 250, 0]
+    cv2.imshow('Final', final_frame)
+    return final_frame
+
+
+def start_detection():
+    global previous_left_top_x, previous_left_bottom_x, previous_right_top_x, previous_right_bottom_x
+
+    while True:
+        isOk, frame = cam.read()
+        if not isOk:
             break
 
         # cv2.imshow('Original', frame)
 
-        width, height = get_resized_frame_dimensions(0.3)
-        resized_frame = resize_frame((width, height))
-        # cv2.imshow('Resized', resized_frame)
+        height, width = map(lambda x: int(x * 0.3), (frame.shape[0], frame.shape[1]))
+        resized_frame = cv2.resize(frame, (width, height))
+        cv2.imshow('Resized', resized_frame)
 
-        grayscale_frame = get_grayscale_frame(resized_frame)
-        # cv2.imshow('Grayscale', grayscale_frame)
+        # grayscale_frame = get_frame_grayscale(resized_frame, width, height)
+        grayscale_frame = cv2.cvtColor(resized_frame, cv2.COLOR_BGR2GRAY)
+        cv2.imshow('Grayscale', grayscale_frame)
 
         trapezoid_frame = get_trapezoid_frame(get_trapezoid_corners(width, height), (height, width))
-        # cv2.imshow('Trapezoid', trapezoid_frame * 255)
+        cv2.imshow('Trapezoid', trapezoid_frame * 255)
 
-        grayscale_road_frame = get_greyscale_road(grayscale_frame, trapezoid_frame)
-        # cv2.imshow('Road', grayscale_road_frame)
+        grayscale_road_frame = grayscale_frame * trapezoid_frame
+        cv2.imshow('Road', grayscale_road_frame)
 
         top_down_view = get_birds_eye_view(grayscale_road_frame, width, height)
-        # cv2.imshow('Birds eye', top_down_view)
+        cv2.imshow('Birds eye', top_down_view)
 
-        blurred_top_down_view = get_blurred_frame(top_down_view)
-        # cv2.imshow('Blurred', blurred_top_down_view)
+        blurred_top_down_view = cv2.blur(top_down_view, ksize=(3, 3))
+        cv2.imshow('Blurred', blurred_top_down_view)
 
         sobel_filtered_top_down_view = combine_filtered_versions_of_frame(blurred_top_down_view)
-        # cv2.imshow('Sobel-filtered', sobel_filtered_top_down_view)
+        cv2.imshow('Sobel-filtered', sobel_filtered_top_down_view)
 
         binary_filtered_top_down = get_binary_frame(sobel_filtered_top_down_view)
-        # cv2.imshow('Binary', binary_filtered_top_down)
+        cv2.imshow('Binary', binary_filtered_top_down)
 
         reduced_binary = remove_redundant_columns(width, binary_filtered_top_down)
-        # cv2.imshow('Binary and reduced', reduced_binary)
+        cv2.imshow('Binary and reduced', reduced_binary)
 
-        line_frame, left_top_point, left_bottom_point, right_top_point, right_bottom_point = add_lines(reduced_binary)
-        # cv2.imshow('lines', line_frame)
+        line_frame, *points = add_lines(reduced_binary)
+        cv2.imshow('lines', line_frame)
 
+        final_frame = get_final_frame(resized_frame, *points)
+        cv2.imshow('Final', final_frame)
 
-
-
-        blank_frame = np.zeros((height, width), dtype=np.uint8)
-        cv2.line(blank_frame, left_top_point, left_bottom_point, (255, 0, 0), 3)
-
-        screen_bounds = np.array(get_screen_corners_from_dimensions(width, height), dtype=np.float32)
-        trapezoid_bounds = np.array(get_trapezoid_corners(width, height), dtype=np.float32)
-
-        magic_matrix_final_left = cv2.getPerspectiveTransform(screen_bounds,
-                                                              trapezoid_bounds)
-        top_down_frame_final_left = cv2.warpPerspective(blank_frame, magic_matrix_final_left, (width, height))
-
-        left_slice_final = top_down_frame_final_left[0:height, 0:int(width / 2)]
-        left_slice_array_final = np.argwhere(left_slice_final == 255)
-
-        left_xs_final = np.array([int(x) for y, x in left_slice_array_final])
-        left_ys_final = np.array([int(y) for y, x in left_slice_array_final])
-        cv2.imshow('Top', top_down_frame_final_left)
-        # right
-        blank_frame_1 = np.zeros((height, width), dtype=np.uint8)
-        cv2.line(blank_frame_1, right_top_point, right_bottom_point, (255, 0, 0), 3)
-        magic_matrix_final_right = cv2.getPerspectiveTransform(screen_bounds,
-                                                               trapezoid_bounds)
-        top_down_frame_final_right = cv2.warpPerspective(blank_frame_1, magic_matrix_final_right, (width, height))
-
-        right_slice_final = top_down_frame_final_right[0:height, int(width / 2):]
-        right_slice_array_final = np.argwhere(right_slice_final == 255)
-        right_xs_final = np.array([int(x + int(width / 2)) for y, x in right_slice_array_final])
-        right_ys_final = np.array([int(y) for y, x in right_slice_array_final])
-        cv2.imshow('Right',top_down_frame_final_right)
-        frame_copy = resized_frame.copy()
-        for i in range(len(left_xs_final)):
-            frame_copy[left_ys_final[i]][left_xs_final[i]] = [50, 50, 250]
-        for i in range(len(right_xs_final)):
-            frame_copy[right_ys_final[i]][right_xs_final[i]] = [50, 250, 50]
-        cv2.imshow('Final', frame_copy)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
 
 previous_left_top_x, previous_left_bottom_x, previous_right_top_x, previous_right_bottom_x = 0, 0, 0, 0
 
-if __name__ == "__main__":
-    start_detection()
-    cam.release()
-    cv2.destroyAllWindows()
+start_detection()
+cam.release()
+cv2.destroyAllWindows()
